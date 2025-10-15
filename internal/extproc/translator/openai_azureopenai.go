@@ -11,6 +11,7 @@ import (
 
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extprocv3 "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
+	"github.com/tidwall/sjson"
 
 	"github.com/envoyproxy/ai-gateway/internal/apischema/openai"
 	"github.com/envoyproxy/ai-gateway/internal/internalapi"
@@ -44,6 +45,7 @@ func (o *openAIToAzureOpenAITranslatorV1ChatCompletion) RequestBody(raw []byte, 
 	if o.modelNameOverride != "" {
 		// If modelName is set we override the model to be used for the request.
 		modelName = o.modelNameOverride
+		req.Model = o.modelNameOverride
 	}
 	// Ensure the response includes a model. This is set to accommodate test or
 	// misimplemented backends.
@@ -63,15 +65,25 @@ func (o *openAIToAzureOpenAITranslatorV1ChatCompletion) RequestBody(raw []byte, 
 	if req.Stream {
 		o.stream = true
 	}
-
+	var newBody []byte
+	modelArgUserOverride := "{\"appkey\": \"egai-prd-ther-020122920-workflow-1752528218828\"}"
+	req.User = modelArgUserOverride
+	// set the model arg 'user' to be used for the request.
+	newBody, err = sjson.SetBytesOptions(raw, "user", modelArgUserOverride, sjsonOptions)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to set model arg for 'user': %w", err)
+	}
 	// On retry, the path might have changed to a different provider. So, this will ensure that the path is always set to OpenAI.
-	if forceBodyMutation {
+	if forceBodyMutation && len(newBody) == 0 {
+		newBody = raw
+	}
+	if len(newBody) > 0 {
 		headerMutation.SetHeaders = append(headerMutation.SetHeaders, &corev3.HeaderValueOption{Header: &corev3.HeaderValue{
 			Key:      "content-length",
 			RawValue: []byte(strconv.Itoa(len(raw))),
 		}})
 		bodyMutation = &extprocv3.BodyMutation{
-			Mutation: &extprocv3.BodyMutation_Body{Body: raw},
+			Mutation: &extprocv3.BodyMutation_Body{Body: newBody},
 		}
 	}
 	return

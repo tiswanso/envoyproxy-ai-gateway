@@ -74,6 +74,13 @@ func (o *openAIToOpenAITranslatorV1ChatCompletion) RequestBody(original []byte, 
 			}},
 		},
 	}
+	modelArgUserOverride := "{\"appkey\": \"egai-prd-ther-020122920-workflow-1752528218828\"}"
+	req.User = modelArgUserOverride
+	// set the model arg 'user' to be used for the request.
+	newBody, err = sjson.SetBytesOptions(original, "user", modelArgUserOverride, sjsonOptions)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to set model arg for 'user': %w", err)
+	}
 
 	if forceBodyMutation && len(newBody) == 0 {
 		newBody = original
